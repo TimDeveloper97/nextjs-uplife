@@ -1,4 +1,4 @@
-import {Store, Product, Category} from '../../models';
+import {Product} from '../../models';
 import {Config} from '../../config';
 import {Helper} from '../../utils/helper.util';
 import {RespStoreFewInfoModel, RespCategoryInfoModel} from '../responses';
@@ -29,7 +29,7 @@ export class RespProductModel extends Model {
   @property()
   userEnoughPoint?: boolean;
 
-  constructor(product: Product, store?: Store, category?: Category, userPoint?: number) {
+  constructor(product: Product, userPoint?: number) {
     super();
     this.id = product.id;
     this.imgUrl = Helper.toImageURL(Config.ImagePath.Product.Url, product.imgUrl);
@@ -41,11 +41,7 @@ export class RespProductModel extends Model {
     if (userPoint !== undefined) {
       this.userEnoughPoint = userPoint >= this.point;
     }
-    if (store) {
-      this.store = new RespStoreFewInfoModel(store);
-    }
-    if (category) {
-      this.category = new RespCategoryInfoModel(category);
-    }
+    this.store = product.store && new RespStoreFewInfoModel(product.store);
+    this.category = product.category && new RespCategoryInfoModel(product.category);
   }
 }

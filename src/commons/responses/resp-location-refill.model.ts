@@ -1,4 +1,4 @@
-import {Store, StoreLocation} from '../../models';
+import {StoreLocation} from '../../models';
 import {Config} from '../../config';
 import {Helper} from '../../utils/helper.util';
 import {model, Model, property} from '@loopback/repository';
@@ -20,15 +20,16 @@ export class RespLocationRefillModel extends Model {
   @property()
   lng: number;
 
-  constructor(store: Store, location: StoreLocation, distance: number) {
+  constructor(location: StoreLocation, distance: number) {
     super();
     this.id = location.id;
     this.address = location.address;
     this.lat = location.lat;
     this.lng = location.lng;
 
-    this.imgUrl = Helper.toImageURL(Config.ImagePath.Store.Url, store.imgUrl);
+    this.imgUrl = Helper.toImageURL(Config.ImagePath.Store.Url, location.store ? location.store.imgUrl : '');
     this.distance = Helper.distanceToString(distance);
+    this._distance = distance;
   }
 }
 
@@ -59,19 +60,19 @@ export class RespLocationRefillDetailModel extends Model {
   @property()
   distance?: string;
 
-  constructor(store: Store, location: StoreLocation, distance?: number) {
+  constructor(location: StoreLocation, distance?: number) {
     super();
     this.id = location.id;
     this.address = location.address;
     this.lat = location.lat;
     this.lng = location.lng;
 
-    this.name = store.name;
-    this.imgUrl = Helper.toImageURL(Config.ImagePath.Store.Url, store.imgUrl);
-    this.openingDays = store.openingDays;
-    this.openingHours = store.openingHours;
+    this.name = location.store ? location.store.name : '';
+    this.imgUrl = Helper.toImageURL(Config.ImagePath.Store.Url, location.store ? location.store.imgUrl : '');
+    this.openingDays = location.store ? location.store.openingDays : '';
+    this.openingHours = location.store ? location.store.openingHours : '';
     this.refillPrice = location.refillPrice;
-    this.typeStation = store.typeStation;
+    this.typeStation = location.store ? location.store.typeStation : '';
 
     this.distance = (distance !== undefined && Helper.distanceToString(distance)) || undefined;
     this.isValidPlace = (distance !== undefined && distance <= Config.MAX_REFILL_DISTANCE && true) || false;

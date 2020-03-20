@@ -1,6 +1,14 @@
 import {Timestamp} from './timestamp.model';
-import {property} from '@loopback/repository';
+import {property, model} from '@loopback/repository';
 
+export const ACCOUNT_STATE = {
+  PENDING: 'pending',
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  BAN: 'ban',
+};
+
+@model()
 export abstract class Account extends Timestamp {
   @property({type: 'string', id: true, mongodb: {dataType: 'ObjectID'}})
   id: string;

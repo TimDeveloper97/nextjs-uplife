@@ -58,6 +58,7 @@
     "bcryptjs": "^2.4.3",
     "crypto": "^1.0.1",
     "dateformat": "^3.0.3",
+    "dotenv": "^8.2.0",
     "firebase-admin": "^8.8.0",
     "jsonwebtoken": "^8.5.1",
     "loopback-connector-mongodb": "^5.2.0",

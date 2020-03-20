@@ -10,9 +10,11 @@ export class Product extends Timestamp {
 
   @belongsTo(() => Store, undefined, {type: 'string', mongodb: {dataType: 'ObjectID'}})
   storeId: string;
+  store?: Store;
 
   @belongsTo(() => Category, undefined, {type: 'string', mongodb: {dataType: 'ObjectID'}})
   categoryId: string;
+  category?: Category;
 
   @property({default: 'default.png'})
   imgUrl: string;

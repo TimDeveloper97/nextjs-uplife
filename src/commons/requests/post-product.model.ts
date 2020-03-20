@@ -1,5 +1,7 @@
 import {model, property, Entity} from '@loopback/repository';
 import {Validate} from '../validate';
+import {getJsonSchema} from '@loopback/rest';
+import {ObjectUtils} from '../../utils';
 
 @model()
 export class PostProductModel extends Entity {
@@ -17,7 +19,9 @@ export class PostProductModel extends Entity {
   quantity: number;
 
   constructor(data?: Partial<PostProductModel>) {
-    super(data);
+    const properties = getJsonSchema(PostProductModel).properties;
+    const obj = ObjectUtils.patch(properties, data);
+    super(obj);
     Validate.productName(this.name);
     this.point = Validate.point(this.point);
     this.dueDate = Validate.duedate(this.dueDate);
@@ -38,8 +42,10 @@ export class PostProductEditModel extends Entity {
   @property({required: true})
   dueDate: Date;
 
-  constructor(data?: Partial<PostProductModel>) {
-    super(data);
+  constructor(data?: Partial<PostProductEditModel>) {
+    const properties = getJsonSchema(PostProductEditModel).properties;
+    const obj = ObjectUtils.patch(properties, data);
+    super(obj);
     Validate.productName(this.name);
     this.point = Validate.point(this.point);
     this.dueDate = Validate.duedate(this.dueDate);

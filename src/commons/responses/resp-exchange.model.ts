@@ -1,9 +1,8 @@
 import {RespStoreFewInfoModel, RespCategoryInfoModel} from '.';
-import {UserExchangeHistory, Product, Store, Category} from '../../models';
+import {UserExchangeHistory} from '../../models';
 import {Config} from '../../config';
 import {Helper} from '../../utils/helper.util';
 
-// import _ = require('lodash');
 import {model, property, Model} from '@loopback/repository';
 
 @model()
@@ -25,20 +24,16 @@ export class RespExchangeModel extends Model {
   @property()
   isAvailable: boolean;
 
-  constructor(exchange: UserExchangeHistory, product: Product, store?: Store, category?: Category) {
+  constructor(exchange: UserExchangeHistory) {
     super();
     this.id = exchange.id;
-    this.imgUrl = Helper.toImageURL(Config.ImagePath.Product.Url, product.imgUrl);
-    this.name = product.name;
+    this.imgUrl = Helper.toImageURL(Config.ImagePath.Product.Url, exchange.product ? exchange.product.imgUrl : '');
+    this.name = exchange.product ? exchange.product.name : '';
     this.point = exchange.point;
     this.dueDate = exchange.dueDate;
     this.isAvailable = !exchange.received && exchange.dueDate >= new Date();
-
-    if (store) {
-      this.store = new RespStoreFewInfoModel(store);
-    }
-    if (category) {
-      this.category = new RespCategoryInfoModel(category);
-    }
+    this.store = exchange.product && exchange.product.store && new RespStoreFewInfoModel(exchange.product.store);
+    this.category =
+      exchange.product && exchange.product.category && new RespCategoryInfoModel(exchange.product.category);
   }
 }

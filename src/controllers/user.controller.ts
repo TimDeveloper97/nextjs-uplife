@@ -15,7 +15,7 @@ import {authenticate, TokenService} from '@loopback/authentication';
 import {AppResponse} from '../commons/app-response.model';
 import {TokenServiceBindings, UploadServiceBindings} from '../keys';
 import {AccountMixin} from './common/account.mixin';
-import {User, UserStepHistory, UserRefillHistory, Store, Category, UserExchangeHistory} from '../models';
+import {User, UserStepHistory, UserRefillHistory, UserExchangeHistory} from '../models';
 import {SecurityBindings} from '@loopback/security';
 import {AccountProfile} from '../commons/types';
 import {
@@ -199,7 +199,7 @@ export class UserController extends AccountMixin<User>(User) {
           });
         break;
     }
-    console.log(data);
+    Log.d('userGetStepHistory: stepHistoryList', data);
     return new AppResponse({data: {stepHistoryList: data}});
   }
 
@@ -209,7 +209,7 @@ export class UserController extends AccountMixin<User>(User) {
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
     @requestBody() stepModel: PostStepListModel,
   ): Promise<AppResponse> {
-    console.log(stepModel.stepList);
+    Log.d('userAddStep: stepList', stepModel.stepList);
     if (stepModel.stepList === undefined || stepModel.stepList.length === 0) {
       throw new AppResponse({code: 400});
     }
@@ -288,31 +288,21 @@ export class UserController extends AccountMixin<User>(User) {
     //   },
     // });
 
-    const locations = await this.storeLocationRepository.find();
-    //console.log(locations);
+    const locations = await this.storeLocationRepository.find({include: [{relation: 'store'}]});
 
-    let result: RespLocationRefillModel[] = [];
-
-    // eslint-disable-next-line @typescript-eslint/prefer-for-of
-    for (let i = 0; i < locations.length; i++) {
-      const store = await this.storeRepository.findById(locations[i].storeId);
-      const distance = Helper.distanceLocation(lat, lng, locations[i].lat, locations[i].lng);
-      const storeRes = new RespLocationRefillModel(store, locations[i], distance);
-      storeRes._distance = distance;
-      //if (distance <= Config.MAX_NEAR_DISTANCE) {
-      //console.log(storeRes);
-      result.push(storeRes);
-    }
+    let result: RespLocationRefillModel[] = locations.map(
+      item => new RespLocationRefillModel(item, Helper.distanceLocation(lat, lng, item.lat, item.lng)),
+    );
+    //if (distance <= Config.MAX_NEAR_DISTANCE)
     result = result.sort((a, b) => {
       return (a._distance && b._distance && a._distance - b._distance) || 0;
     });
-    //console.log(result);
+    Log.d('userGetStoreByLocation: listStore', result);
     result = result.slice(
       0,
       (result.length >= Config.MAX_REFILL_LOCATION_RESPONSE_NUMBER && Config.MAX_REFILL_LOCATION_RESPONSE_NUMBER) ||
         result.length,
     );
-
     return new AppResponse({data: {listStore: result}});
   }
 
@@ -323,14 +313,15 @@ export class UserController extends AccountMixin<User>(User) {
     @param.query.number('lat') lat: number,
     @param.query.number('lng') lng: number,
   ): Promise<AppResponse> {
-    const location = await this.storeLocationRepository.findById(storeLocationId).catch(err => {
-      throw new AppResponse({code: 404});
-    });
+    const location = await this.storeLocationRepository
+      .findById(storeLocationId, {include: [{relation: 'store'}]})
+      .catch(err => {
+        throw new AppResponse({code: 404});
+      });
 
-    const store = await this.storeRepository.findById(location.storeId);
-    const data = new RespLocationRefillDetailModel(store, location);
+    const data = new RespLocationRefillDetailModel(location);
 
-    if (data && lat && lng) {
+    if (data && lat !== undefined && lng !== undefined) {
       data.setDistance(Helper.distanceLocation(lat, lng, location.lat, location.lng));
     }
     return new AppResponse({data: data});
@@ -409,7 +400,7 @@ export class UserController extends AccountMixin<User>(User) {
         strictObjectIDCoercion: false,
       },
     );
-    //console.log(refillHistory);
+
     if (refillHistory) {
       if (refillHistory.length > 5) {
         throw new AppResponse({
@@ -426,7 +417,7 @@ export class UserController extends AccountMixin<User>(User) {
         lng: position.lng,
       }),
     );
-    console.log(newRefillHistory);
+    Log.d('userRefill: newRefillHistory', newRefillHistory);
     await this.userRepository.updateById(user.id, {
       currentPoint: user.currentPoint + Config.POINT_PER_REFILL,
     });
@@ -445,41 +436,31 @@ export class UserController extends AccountMixin<User>(User) {
     const user = await this.userRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    const data = [];
+    let data: RespProductModel[] = [];
     if (categoryName.toLocaleLowerCase() === 'all') {
       const products = await this.productRepository.find({
         where: {quantity: {gt: 0}},
         order: ['createAt DESC'],
+        include: [{relation: 'category'}, {relation: 'store'}],
       });
 
-      // eslint-disable-next-line @typescript-eslint/prefer-for-of
-      for (let i = 0; i < products.length; i++) {
-        const store = await this.storeRepository.findById(products[i].storeId).catch(err => {
-          return new Store();
-        });
-        const category = await this.categoryRepository.findById(products[i].categoryId).catch(err => {
-          return new Category();
-        });
-        const result: RespProductModel = new RespProductModel(products[i], store, category);
-        data.push(result);
-      }
+      data = products.map(item => new RespProductModel(item, user.currentPoint));
     } else {
       const category = await this.categoryRepository.findOne({
         where: {name: {eq: categoryName.toLocaleLowerCase()}},
       });
       if (category !== null) {
-        const products = await this.categoryRepository.products(category.id).find(
-          {where: {quantity: {gt: 0}}, order: ['createAt DESC']},
+        const products = await this.productRepository.find(
+          {
+            where: {categoryId: category.id, quantity: {gt: 0}},
+            order: ['createAt DESC'],
+            include: [{relation: 'category'}, {relation: 'store'}],
+          },
           {
             strictObjectIDCoercion: false,
           },
         );
-        // eslint-disable-next-line @typescript-eslint/prefer-for-of
-        for (let i = 0; i < products.length; i++) {
-          const store = await this.storeRepository.findById(products[i].storeId);
-          const result = new RespProductModel(products[i], store, category, user.currentPoint);
-          data.push(result);
-        }
+        data = products.map(item => new RespProductModel(item, user.currentPoint));
       }
     }
     return new AppResponse({data: {productList: data}});
@@ -538,44 +519,40 @@ export class UserController extends AccountMixin<User>(User) {
     const user = await this.userRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    let exchanges;
+    let exchanges: UserExchangeHistory[] = [];
     switch (type.toLocaleLowerCase()) {
       case 'all':
         exchanges = await this.userRepository.exchangeHistory(user.id).find(
           {
             order: ['received ASC', 'createAt DESC'],
+            include: [{relation: 'product', scope: {include: [{relation: 'store'}, {relation: 'category'}]}}],
           },
           {strictObjectIDCoercion: false},
         );
         break;
       case 'available':
-        exchanges = await this.userRepository
-          .exchangeHistory(user.id)
-          .find({where: {received: false}, order: ['createAt DESC']}, {strictObjectIDCoercion: false});
+        exchanges = await this.userRepository.exchangeHistory(user.id).find(
+          {
+            where: {received: false},
+            order: ['createAt DESC'],
+            include: [{relation: 'product', scope: {include: [{relation: 'store'}, {relation: 'category'}]}}],
+          },
+          {strictObjectIDCoercion: false},
+        );
         break;
       case 'used':
-        exchanges = await this.userRepository
-          .exchangeHistory(user.id)
-          .find({where: {received: true}, order: ['createAt DESC']}, {strictObjectIDCoercion: false});
+        exchanges = await this.userRepository.exchangeHistory(user.id).find(
+          {
+            where: {received: true},
+            order: ['createAt DESC'],
+            include: [{relation: 'product', scope: {include: [{relation: 'store'}, {relation: 'category'}]}}],
+          },
+          {strictObjectIDCoercion: false},
+        );
         break;
     }
-    const results = [];
-    if (exchanges && exchanges.length > 0) {
-      // eslint-disable-next-line @typescript-eslint/prefer-for-of
-      for (let i = 0; i < exchanges.length; i++) {
-        const product = await this.productRepository.findById(exchanges[i].productId);
-        const store = await this.storeRepository.findById(product.storeId).catch(err => {
-          return new Store();
-        });
-        const category = await this.categoryRepository.findById(product.categoryId).catch(err => {
-          return new Category();
-        });
-        product.point = exchanges[i].point;
-        const result: RespExchangeModel = new RespExchangeModel(exchanges[i], product, store, category);
-        results.push(result);
-      }
-    }
-    console.log(results);
+    const results = exchanges.map(item => new RespExchangeModel(item));
+    Log.d('userGetBuy: rewardList', results);
     return new AppResponse({data: {rewardList: results}});
   }
 
@@ -611,18 +588,14 @@ export class UserController extends AccountMixin<User>(User) {
       throw new AppResponse({code: 400, message: 'Reward was received'});
     }
 
-    const product = await this.productRepository.findById(exchange.productId);
-    const store = await this.storeRepository.findById(product.storeId).catch(err => {
-      return undefined;
-    });
-    const category = await this.categoryRepository.findById(product.categoryId).catch(err => {
-      return undefined;
+    const product = await this.productRepository.findById(exchange.productId, {
+      include: [{relation: 'category'}, {relation: 'store'}],
     });
 
     return new AppResponse({
       data: {
         codeQR: exchange.id,
-        product: new RespProductModel(product, store, category),
+        product: new RespProductModel(product),
       },
     });
   }
@@ -751,7 +724,7 @@ export class UserController extends AccountMixin<User>(User) {
     });
   }
 
-  @put('/api/user/runningrecord/{recordId}', resSpec('Result edit', RespRunningRecordModel))
+  @put('/api/user/runningrecord/{recordId}', resSpec('Result edit', {}))
   @authenticate('jwt')
   async userEditRunningRecord(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -792,7 +765,7 @@ export class UserController extends AccountMixin<User>(User) {
       ),
     );
     fileUploaded = fileUploaded.map(item => FileService.getFileName(item));
-    Log.d('userEditRunningRecord', fileUploaded);
+    Log.d('userEditRunningRecord: fileUploaded', fileUploaded);
     try {
       const postEditRunningRecordModel = new PostEditRunningRecordModel(request.body);
       Log.d('userEditRunningRecord: postEditRunningRecordModel', postEditRunningRecordModel);
@@ -807,6 +780,9 @@ export class UserController extends AccountMixin<User>(User) {
       const removeFile: string[] = [];
 
       if (postEditRunningRecordModel.removeSelfieFile !== undefined) {
+        postEditRunningRecordModel.removeSelfieFile = postEditRunningRecordModel.removeSelfieFile.map(item => {
+          return item ? FileService.getFileName(item) : 'undefined';
+        });
         selfieImageUrl = selfieImageUrl.filter(value => {
           if ((postEditRunningRecordModel.removeSelfieFile || []).includes(value)) {
             removeFile.push(value);
@@ -839,7 +815,7 @@ export class UserController extends AccountMixin<User>(User) {
         {id: recordId},
       );
       Log.d('userDeleteRunningRecord: edited', count);
-      return new AppResponse({code: 200, data: count});
+      return new AppResponse();
     } catch (error) {
       await Promise.all(
         fileUploaded.map(
@@ -863,6 +839,6 @@ export class UserController extends AccountMixin<User>(User) {
     });
     const count = await this.userRepository.runningRecord(currentUser.id).delete({id: recordId});
     Log.d('userDeleteRunningRecord: count', count);
-    return new AppResponse({code: 200, data: count && count.count === 1 ? {recordId: recordId} : count});
+    return new AppResponse();
   }
 }

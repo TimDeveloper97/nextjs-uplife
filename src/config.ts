@@ -1,7 +1,7 @@
 import path = require('path');
 
 export namespace Config {
-  export const HOST = 'http://107.113.194.139:3000/';
+  export const HOST = process.env.PUBLIC_URL || 'http://localhost:3000/';
 
   export const EARTH_RADIUS = 6371000;
   export const MAX_NEAR_DISTANCE = 10000;
@@ -21,13 +21,6 @@ export namespace Config {
 
   export const MAX_STEP_HISTORY_RESPONSE_NUMBER = 30;
   export const MAX_REFILL_LOCATION_RESPONSE_NUMBER = 10;
-
-  export const STATE = {
-    PENDING: 'pending',
-    ACTIVE: 'active',
-    INACTIVE: 'inactive',
-    BAN: 'ban',
-  };
 
   export const UploadService = {
     MaxFileSize: 10 * 1024 * 1024, //10MB

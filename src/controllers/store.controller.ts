@@ -12,7 +12,7 @@ import {
   ProductRepository,
 } from '../repositories';
 import {resSpec, requestBodyFileUpload, Helper} from '../utils';
-import {Store, Category, Product, StoreLocation} from '../models';
+import {Store, Product, StoreLocation} from '../models';
 import {AccountMixin} from './common/account.mixin';
 import {AppResponse} from '../commons/app-response.model';
 import {SecurityBindings} from '@loopback/security';
@@ -43,7 +43,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     super(storeRepository, tokenService);
   }
 
-  @get('/api/store/info', resSpec('User profile', RespStoreInfoModel))
+  @get('/api/store/info', resSpec('Store profile', RespStoreInfoModel))
   @authenticate('jwt')
   async storeGetInfo(@inject(SecurityBindings.USER) currentUser: AccountProfile): Promise<AppResponse> {
     const store = await this.storeRepository.findById(currentUser.id).catch(err => {
@@ -52,7 +52,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({data: new RespStoreInfoModel(store)});
   }
 
-  @post('/api/store/info', resSpec('User profile', RespStoreInfoModel))
+  @post('/api/store/info', resSpec('Store profile', RespStoreInfoModel))
   @authenticate('jwt')
   async storeEditInfo(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -72,7 +72,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({data: new RespStoreInfoModel(store)});
   }
 
-  @post('/api/store/avatar', resSpec('User profile', RespStoreInfoModel))
+  @post('/api/store/avatar', resSpec('Store profile', RespStoreInfoModel))
   @authenticate('jwt')
   async storeUploadAvatar(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -108,47 +108,60 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({data: new RespStoreInfoModel(store)});
   }
 
-  @get('/api/store/token', resSpec('User profile', RespStoreInfoModel))
+  @get('/api/store/token', resSpec('Store profile', RespStoreInfoModel))
   @authenticate('jwt')
   async storeToken(@inject(SecurityBindings.USER) currentUser: AccountProfile): Promise<AppResponse> {
     return new AppResponse({data: currentUser});
   }
 
-  @get('/api/store/product', resSpec('User profile', RespStoreInfoModel))
+  @get('/api/store/product', resSpec('Store profile', RespStoreInfoModel))
   @authenticate('jwt')
   async storeGetProduct(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
     @param.query.string('name') name: string,
   ): Promise<AppResponse> {
-    const data: RespProductModel[] = [];
+    let data: RespProductModel[] = [];
     const store = await this.storeRepository.findById(currentUser.id);
 
     const products = await this.storeRepository.products(store.id).find(
       {
         where: (name && {name: {like: name}}) || undefined,
         order: ['createAt DESC'],
+        include: [{relation: 'category'}, {relation: 'store'}],
       },
       {
         strictObjectIDCoercion: false,
       },
     );
-
-    // eslint-disable-next-line @typescript-eslint/prefer-for-of
-    for (let i = 0; i < products.length; i++) {
-      const category = await this.categoryRepository.findById(products[i].categoryId).catch(err => {
-        return new Category();
-      });
-      const result: RespProductModel = new RespProductModel(products[i], store, category);
-      data.push(result);
-    }
+    data = products.map(item => new RespProductModel(item));
     return new AppResponse({data: data});
   }
 
-  @post('/api/store/product')
+  @post('/api/store/product', resSpec('Create result', {}))
   @authenticate('jwt')
   async storeAddProduct(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
-    @requestBody(requestBodyFileUpload) request: Request,
+    @requestBody({
+      description: 'multipart/form-data value.',
+      required: true,
+      content: {
+        'multipart/form-data': {
+          'x-parser': 'stream',
+          schema: {
+            type: 'object',
+            properties: {
+              avatar: {description: 'Image file'},
+              categoryName: {description: 'Category name', type: 'string'},
+              name: {description: 'Product name', type: 'string'},
+              point: {description: 'Point', type: 'integer'},
+              dueDate: {description: 'Duedate, ex: 2020-03-03T20:00:00.000Z', type: 'string'},
+              quantity: {description: 'Quantity', type: 'integer'},
+            },
+          },
+        },
+      },
+    })
+    request: Request,
     @inject(RestBindings.Http.RESPONSE) response: Response,
   ): Promise<AppResponse> {
     const store = await this.storeRepository.findById(currentUser.id).catch(err => {
@@ -156,12 +169,12 @@ export class StoreController extends AccountMixin<Store>(Store) {
     });
 
     const fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
-    if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
+    //if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
 
     try {
       const productpos = new PostProductModel(request.body);
 
-      productpos.imgUrl = fileUploaded || undefined;
+      productpos.imgUrl = fileUploaded || 'default.png';
 
       const category = await this.categoryRepository.findOne({
         where: {name: productpos.categoryName.toLocaleLowerCase()},
@@ -175,25 +188,43 @@ export class StoreController extends AccountMixin<Store>(Store) {
       product.total = product.quantity;
 
       await this.storeRepository.products(store.id).create(product);
+      return new AppResponse();
     } catch (error) {
       FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, fileUploaded));
+      throw error;
     }
-    return new AppResponse();
   }
 
-  @post('/api/store/product/{productId}')
+  @post('/api/store/product/{productId}', resSpec('Edit result', {}))
   @authenticate('jwt')
   async storeEditProduct(
     @param.path.string('productId') productId: string,
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
-    @requestBody(requestBodyFileUpload) request: Request,
+    @requestBody({
+      description: 'multipart/form-data value.',
+      required: true,
+      content: {
+        'multipart/form-data': {
+          'x-parser': 'stream',
+          schema: {
+            type: 'object',
+            properties: {
+              avatar: {description: 'Image file'},
+              name: {description: 'Product name', type: 'string'},
+              point: {description: 'Point', type: 'integer'},
+              dueDate: {description: 'Duedate, ex: 2020-03-03T20:00:00.000Z', type: 'string'},
+            },
+          },
+        },
+      },
+    })
+    request: Request,
     @inject(RestBindings.Http.RESPONSE) response: Response,
   ): Promise<AppResponse> {
     const store = await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
     const fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
-    if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
 
     try {
       const productpos = new PostProductEditModel(request.body);
@@ -229,13 +260,18 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse();
   }
 
-  @get('/api/store/location')
+  @get(
+    '/api/store/location',
+    resSpec('List store location', {
+      locationList: {type: 'array', items: {$ref: '#/components/schemas/StoreLocation'}},
+    }),
+  )
   @authenticate('jwt')
   async storeGetLocation(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
     @param.query.string('address') address: string,
   ) {
-    const data = await this.storeRepository.locations(currentUser.id).find(
+    const data: StoreLocation[] = await this.storeRepository.locations(currentUser.id).find(
       {
         where: (address && {address: address}) || undefined,
         // fields: {createAt: false, updateAt: false, storeId: false},
@@ -247,7 +283,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({data: {locationList: data}});
   }
 
-  @post('/api/store/location')
+  @post('/api/store/location', resSpec('Add result', {}))
   @authenticate('jwt')
   async storeAddLocation(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -267,7 +303,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse();
   }
 
-  @post('/api/store/location/{storeLocationId}')
+  @post('/api/store/location/{storeLocationId}', resSpec('Edit result', {}))
   @authenticate('jwt')
   async storeEditLocation(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -299,7 +335,13 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse();
   }
 
-  @get('/api/store/exchange')
+  @get(
+    '/api/store/exchange',
+    resSpec('Exchange info', {
+      userInfo: {$ref: '#/components/schemas/RespUserInfoModel'},
+      product: {$ref: '#/components/schemas/RespProductModel'},
+    }),
+  )
   @authenticate('jwt')
   async storeCheckExchange(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -308,7 +350,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     if (!code) {
       throw new AppResponse({code: 400, message: 'QRcode invalid'});
     }
-    const store = await this.storeRepository.findById(currentUser.id).catch(err => {
+    await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 404});
     });
     const exchange = await this.exchangeHistoryRepository.findById(code).catch(err => {
@@ -320,9 +362,11 @@ export class StoreController extends AccountMixin<Store>(Store) {
     const user = await this.userRepository.findById(exchange.userId).catch(err => {
       throw new AppResponse({code: 400, message: 'QRcode invalid'});
     });
-    const product = await this.productRepository.findById(exchange.productId).catch(err => {
-      throw new AppResponse({code: 400, message: 'Product not found'});
-    });
+    const product = await this.productRepository
+      .findById(exchange.productId, {include: [{relation: 'category'}, {relation: 'store'}]})
+      .catch(err => {
+        throw new AppResponse({code: 400, message: 'Product not found'});
+      });
 
     if (product.storeId !== currentUser.id) {
       throw new AppResponse({code: 400, message: 'QRcode invalid with store'});
@@ -330,12 +374,18 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({
       data: {
         userInfo: new RespUserInfoModel(user),
-        product: new RespProductModel(product, store),
+        product: new RespProductModel(product),
       },
     });
   }
 
-  @post('/api/store/exchange')
+  @post(
+    '/api/store/exchange',
+    resSpec('Exchange info', {
+      userInfo: {type: {$ref: '#/components/schemas/RespUserInfoModel'}},
+      product: {type: {$ref: '#/components/schemas/RespProductModel'}},
+    }),
+  )
   @authenticate('jwt')
   async storeExchanging(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -345,7 +395,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     if (!code) {
       throw new AppResponse({code: 400, message: 'QRcode invalid'});
     }
-    const store = await this.storeRepository.findById(currentUser.id).catch(err => {
+    await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 404});
     });
     const exchange = await this.exchangeHistoryRepository.findById(code.codeQR).catch(err => {
@@ -357,9 +407,11 @@ export class StoreController extends AccountMixin<Store>(Store) {
     const user = await this.userRepository.findById(exchange.userId).catch(err => {
       throw new AppResponse({code: 400, message: 'QRcode invalid'});
     });
-    const product = await this.productRepository.findById(exchange.productId).catch(err => {
-      throw new AppResponse({code: 400, message: 'Product not found'});
-    });
+    const product = await this.productRepository
+      .findById(exchange.productId, {include: [{relation: 'category'}, {relation: 'store'}]})
+      .catch(err => {
+        throw new AppResponse({code: 400, message: 'Product not found'});
+      });
 
     if (product.storeId !== currentUser.id) {
       throw new AppResponse({code: 400, message: 'QRcode invalid with store'});
@@ -370,7 +422,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
     return new AppResponse({
       data: {
         userInfo: new RespUserInfoModel(user),
-        product: new RespProductModel(product, store),
+        product: new RespProductModel(product),
       },
     });
   }

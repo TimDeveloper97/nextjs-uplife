@@ -13,6 +13,7 @@ export class UserExchangeHistory extends Timestamp {
 
   @belongsTo(() => Product, undefined, {type: 'string', mongodb: {dataType: 'ObjectID'}})
   productId: string;
+  product?: Product;
 
   @property()
   received: boolean;

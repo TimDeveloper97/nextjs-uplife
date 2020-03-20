@@ -4,15 +4,18 @@ import {inject} from '@loopback/core';
 import {Category, Product} from '../models';
 import {ProductRepository} from './product.repository';
 import {TimeStampRepository} from './timestamp-repository';
+import {Getter} from '@loopback/context';
 
 export class CategoryRepository extends TimeStampRepository<Category, typeof Category.prototype.id> {
-  public products: HasManyRepositoryFactory<Product, typeof Category.prototype.id>;
+  public readonly products: HasManyRepositoryFactory<Product, typeof Category.prototype.id>;
   constructor(
     @inject('datasources.mongo') dataSource: MongoDataSource,
-    @repository(ProductRepository) productRepository: ProductRepository,
+    @repository.getter('ProductRepository') productRepositoryGetter: Getter<ProductRepository>,
   ) {
     super(Category, dataSource);
-    this.products = this.createHasManyRepositoryFactoryFor('products', async () => productRepository);
+    this.products = this.createHasManyRepositoryFactoryFor('products', productRepositoryGetter);
+
+    this.registerInclusionResolver('products', this.products.inclusionResolver);
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
     this.startUp();
   }

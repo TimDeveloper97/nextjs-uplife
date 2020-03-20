@@ -8,7 +8,7 @@ export namespace PackageBindings {
 }
 
 export namespace TokenServiceConstant {
-  export const TOKEN_SECRET_VALUE = 'jwtsecret';
+  export const TOKEN_SECRET_VALUE = process.env.JWT_SECRET || 'jwtsecret';
   export const TOKEN_EXPIRES_IN_VALUE = 86400 * 7;
 }
 

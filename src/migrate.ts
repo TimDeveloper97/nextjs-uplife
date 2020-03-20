@@ -1,3 +1,4 @@
+require('dotenv').config();
 import {Application} from './application';
 
 export async function migrate(args: string[]) {
