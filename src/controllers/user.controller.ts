@@ -724,7 +724,7 @@ export class UserController extends AccountMixin<User>(User) {
     });
   }
 
-  @put('/api/user/runningrecord/{recordId}', resSpec('Result edit', {}))
+  @put('/api/user/runningrecord/{recordId}', resSpec('Result edit', RespRunningRecordModel))
   @authenticate('jwt')
   async userEditRunningRecord(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -770,12 +770,8 @@ export class UserController extends AccountMixin<User>(User) {
       const postEditRunningRecordModel = new PostEditRunningRecordModel(request.body);
       Log.d('userEditRunningRecord: postEditRunningRecordModel', postEditRunningRecordModel);
 
-      const currentRecord = await this.userRepository
-        .runningRecord(currentUser.id)
-        .find({where: {id: recordId}})
-        .catch(err => {
-          throw new AppResponse({code: 401});
-        });
+      const currentRecord = await this.userRepository.runningRecord(currentUser.id).find({where: {id: recordId}});
+      if (currentRecord.length === 0) throw new AppResponse({code: 401});
       let selfieImageUrl = currentRecord[0].selfieImageUrl || [];
       const removeFile: string[] = [];
 
@@ -814,8 +810,9 @@ export class UserController extends AccountMixin<User>(User) {
         },
         {id: recordId},
       );
+      const updatedRecord = await this.userRepository.runningRecord(currentUser.id).find({where: {id: recordId}});
       Log.d('userDeleteRunningRecord: edited', count);
-      return new AppResponse();
+      return new AppResponse({code: 200, data: updatedRecord[0] && new RespRunningRecordModel(updatedRecord[0])});
     } catch (error) {
       await Promise.all(
         fileUploaded.map(
@@ -828,7 +825,7 @@ export class UserController extends AccountMixin<User>(User) {
     }
   }
 
-  @del('/api/user/runningrecord/{recordId}', resSpec('Result remove', {}))
+  @del('/api/user/runningrecord/{recordId}', resSpec('Result remove', {recordId: {type: 'string'}}))
   @authenticate('jwt')
   async userDeleteRunningRecord(
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
@@ -839,6 +836,6 @@ export class UserController extends AccountMixin<User>(User) {
     });
     const count = await this.userRepository.runningRecord(currentUser.id).delete({id: recordId});
     Log.d('userDeleteRunningRecord: count', count);
-    return new AppResponse();
+    return new AppResponse({code: 200, data: {recordId: count.count && recordId}});
   }
 }

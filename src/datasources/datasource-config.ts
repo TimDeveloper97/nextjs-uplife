@@ -1,8 +1,10 @@
 import {Log} from '../utils';
+import * as mongoInit from './mongo.datasource.json';
 
 export namespace Datasource {
-  function initDatasource(defaultInitPath: string, name: string): object {
-    const datasource = require(defaultInitPath);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function initDatasource(defaultInit: any, name: string): object {
+    const datasource = defaultInit;
     datasource.url = process.env[`${name.toUpperCase()}_URL`] || datasource.url;
     datasource.host = process.env[`${name.toUpperCase()}_HOST`] || datasource.host;
     datasource.port = process.env[`${name.toUpperCase()}_PORT`] || datasource.port;
@@ -11,7 +13,7 @@ export namespace Datasource {
     datasource.database = process.env[`${name.toUpperCase()}_DATABASE`] || datasource.database;
     return datasource;
   }
-  export const mongo: object = initDatasource('./mongo.datasource.json', 'mongo');
+  export const mongo: object = initDatasource(mongoInit, 'mongo');
 
   Log.i('Datasource: mongo', mongo);
 }
