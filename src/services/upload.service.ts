@@ -32,8 +32,7 @@ export class UploadService {
       }).single(fieldName),
     );
     await upload(req, res);
-    // console.log('\n\n');
-    // console.log(req.file);
+
     const tempUploadedFile = req.file && req.file.filename;
     if (!tempUploadedFile) return tempUploadedFile;
     return path.join(Config.UploadService.TempDir, tempUploadedFile);
@@ -48,8 +47,7 @@ export class UploadService {
       }).array(fieldName),
     );
     await upload(req, res);
-    // console.log('\n\n');
-    // console.log(req.files);
+
     const tempUploadedFiles: string[] = (req.files as Express.Multer.File[]).map((file): string => file.filename);
     if (!tempUploadedFiles) return tempUploadedFiles;
     return tempUploadedFiles.map((item: string): string => path.join(Config.UploadService.TempDir, item));
@@ -63,9 +61,6 @@ export class UploadService {
   }
 
   private imageFilter(req: Express.Request, file: Express.Multer.File, callback: FileFilterCallback) {
-    // console.log(req);
-    // console.log(file);
-    // console.log(req.files);
     const err =
       (file.mimetype && file.mimetype.startsWith('image') && IMAGE_TYPE.includes(path.extname(file.originalname))
         ? null

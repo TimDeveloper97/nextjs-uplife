@@ -94,20 +94,16 @@ export class UserController extends AccountMixin<User>(User) {
     let user = await this.userRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    const fileName = currentUser.id + '.jpg';
     let fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
     if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
+    const fileName = FileService.getFileName(fileUploaded);
     fileUploaded = FileService.moveFile(fileUploaded, Config.ImagePath.User.Dir, fileName);
 
     try {
       if (fileUploaded) {
-        await this.userRepository.updateById(currentUser.id, {imgUrl: fileName}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.userRepository.updateById(currentUser.id, {imgUrl: fileName});
       } else {
-        await this.userRepository.updateById(currentUser.id, {imgUrl: 'default.png'}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.userRepository.updateById(currentUser.id, {imgUrl: 'default.png'});
       }
 
       if (user.imgUrl !== 'default.png') {
@@ -649,7 +645,7 @@ export class UserController extends AccountMixin<User>(User) {
       ),
     );
     fileUploaded = fileUploaded.map(item => FileService.getFileName(item));
-    Log.d('userPostRunningRecord', fileUploaded);
+    Log.d('userPostRunningRecord: fileUploaded', fileUploaded);
     try {
       Log.d('userPostRunningRecord: request body', request.body);
       const postRunningRecord = new PostRunningRecordModel(request.body);
@@ -772,6 +768,7 @@ export class UserController extends AccountMixin<User>(User) {
 
       const currentRecord = await this.userRepository.runningRecord(currentUser.id).find({where: {id: recordId}});
       if (currentRecord.length === 0) throw new AppResponse({code: 401});
+
       let selfieImageUrl = currentRecord[0].selfieImageUrl || [];
       const removeFile: string[] = [];
 
@@ -810,9 +807,9 @@ export class UserController extends AccountMixin<User>(User) {
         },
         {id: recordId},
       );
-      const updatedRecord = await this.userRepository.runningRecord(currentUser.id).find({where: {id: recordId}});
+      const recordEdited = await this.userRepository.runningRecord(currentUser.id).find({where: {id: recordId}});
       Log.d('userDeleteRunningRecord: edited', count);
-      return new AppResponse({code: 200, data: updatedRecord[0] && new RespRunningRecordModel(updatedRecord[0])});
+      return new AppResponse({code: 200, data: new RespRunningRecordModel(recordEdited[0])});
     } catch (error) {
       await Promise.all(
         fileUploaded.map(
@@ -836,6 +833,6 @@ export class UserController extends AccountMixin<User>(User) {
     });
     const count = await this.userRepository.runningRecord(currentUser.id).delete({id: recordId});
     Log.d('userDeleteRunningRecord: count', count);
-    return new AppResponse({code: 200, data: {recordId: count.count && recordId}});
+    return new AppResponse({code: 200, data: {recordId: count.count ? recordId : ''}});
   }
 }

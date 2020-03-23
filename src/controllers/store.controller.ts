@@ -58,7 +58,6 @@ export class StoreController extends AccountMixin<Store>(Store) {
     @inject(SecurityBindings.USER) currentUser: AccountProfile,
     @requestBody() storeInfo: PostStoreInfoModel,
   ): Promise<AppResponse> {
-    console.log(storeInfo);
     storeInfo = new PostStoreInfoModel(storeInfo);
     let store = await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
@@ -82,20 +81,16 @@ export class StoreController extends AccountMixin<Store>(Store) {
     let store = await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    const fileName = currentUser.id + '.jpg';
     let fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
     if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
+    const fileName = FileService.getFileName(fileUploaded);
     fileUploaded = FileService.moveFile(fileUploaded, Config.ImagePath.Store.Dir, fileName);
 
     try {
       if (fileUploaded) {
-        await this.userRepository.updateById(currentUser.id, {imgUrl: fileName}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.userRepository.updateById(currentUser.id, {imgUrl: fileName});
       } else {
-        await this.userRepository.updateById(currentUser.id, {imgUrl: 'default.png'}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.userRepository.updateById(currentUser.id, {imgUrl: 'default.png'});
       }
 
       if (store.imgUrl !== 'default.png') {

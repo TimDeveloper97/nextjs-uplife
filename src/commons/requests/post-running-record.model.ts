@@ -38,13 +38,11 @@ export class PostRunningRecordModel extends Entity {
 
   constructor(data?: Partial<PostRunningRecordModel>) {
     const properties = getJsonSchema(PostRunningRecordModel).properties;
-    console.log(getJsonSchema(PostRunningRecordModel));
     const obj = ObjectUtils.patch(properties, data);
     super(obj);
     this.path = this.path || [];
     this.startTime = (this.startTime && new Date(this.startTime.toString())) || new Date();
     this.endTime = (this.endTime && new Date(this.endTime.toString())) || new Date();
-    console.log(this.path);
     this.path = parseJson(this.path.toString());
     this.totalStep = this.totalStep ? parseInt(this.totalStep.toString()) : 0;
     this.totalCalorie = this.totalCalorie ? parseFloat(this.totalCalorie.toString()) : 0;

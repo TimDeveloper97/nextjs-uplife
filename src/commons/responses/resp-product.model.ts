@@ -2,7 +2,6 @@ import {Product} from '../../models';
 import {Config} from '../../config';
 import {Helper} from '../../utils/helper.util';
 import {RespStoreFewInfoModel, RespCategoryInfoModel} from '../responses';
-// import _ = require('lodash');
 import {Model} from '@loopback/rest';
 import {model, property} from '@loopback/repository';
 

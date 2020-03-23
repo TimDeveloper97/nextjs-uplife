@@ -34,12 +34,11 @@ export class MySequence implements SequenceHandler {
   ) {}
 
   async handle(context: RequestContext) {
+    const {request, response} = context;
+    const url = request.method + ' ' + request.url;
     try {
-      const {request, response} = context;
       const route = this.findRoute(request);
-      if (request.url.startsWith('/api')) {
-        Log.i(TAG, request.method + ' ' + request.url);
-      }
+      if (request.url.startsWith('/api')) Log.i(TAG, url);
       await this.authenticateRequest(request);
       const args = await this.parseParams(request, route);
       const result = await this.invoke(route, args);
@@ -53,12 +52,14 @@ export class MySequence implements SequenceHandler {
       }
       if (err && err.statusCode && typeof err.statusCode === 'number') {
         context.response.status(err.statusCode);
-        const message = (err.details && err.details[0] && err.details[0].message) || err.message;
+        let message = (err.details && err.details[0] && err.details[0].message) || err.message;
+        if (err.details && err.details[0] && err.details[0].path)
+          message = err.details[0].path.replace('.', '') + ' ' + message;
         const data = new AppResponse({code: err.statusCode, message: message});
-        Log.e(TAG, data);
-        this.send(context.response, data);
+        Log.e(TAG, url, data);
+        this.send(response, data);
       } else {
-        Log.e(TAG, err);
+        Log.e(TAG, url, err);
         this.reject(context, err);
       }
     }

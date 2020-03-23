@@ -69,20 +69,16 @@ export class AdminController extends AccountMixin<Admin>(Admin) {
     let user = await this.adminRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    const fileName = currentUser.id + '.jpg';
     let fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
     if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
+    const fileName = FileService.getFileName(fileUploaded);
     fileUploaded = FileService.moveFile(fileUploaded, Config.ImagePath.Admin.Dir, fileName);
 
     try {
       if (fileUploaded) {
-        await this.adminRepository.updateById(currentUser.id, {imgUrl: fileName}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.adminRepository.updateById(currentUser.id, {imgUrl: fileName});
       } else {
-        await this.adminRepository.updateById(currentUser.id, {imgUrl: 'default.png'}).catch(err => {
-          throw new AppResponse({code: 500});
-        });
+        await this.adminRepository.updateById(currentUser.id, {imgUrl: 'default.png'});
       }
 
       if (user.imgUrl !== 'default.png') {

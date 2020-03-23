@@ -14,17 +14,24 @@ const consoleFormFormat = format.printf(({level, message, timestamp}) => {
 
 const timestampFormat = format.timestamp({format: 'MM-DD HH:mm:ss.SSSZZ'});
 
+const regexFormat = '%[sdifjoOc]';
+const objectFormat = '%o';
+
 const splatFormat = format((info, opts) => {
   opts = {colors: false, compact: true, ...opts};
   const splat = (info as any)[Symbol.for('splat')] || info.splat;
-  // console.log(splat);
-  // const regex = /^(([^:]*):)(([^:%]*):?)(?= %o)/;
-  // if (regex.test(info.message)) {
-  // info.message = info.message.slice(0, -2) + '\n' + '%o';
-  // console.log(process.env.COMPACT_ENV);
-  // }
+
   if (process.env.COMPACT_ENV) opts.compact = false;
+
   if (splat && splat.length > 0) {
+    info.message = (typeof info.message === 'string' && info.message) || '';
+    if (splat[0].message) info.message = info.message.replace(splat[0].message, '');
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    let idx: any = info.message.match(new RegExp(regexFormat, 'g'));
+    idx = (idx && idx.length) || 0;
+    while (idx < splat.length && idx++) {
+      info.message += info.message ? ` ${objectFormat}` : objectFormat;
+    }
     info.message = util.formatWithOptions(
       {
         colors: opts.colors,
@@ -45,7 +52,7 @@ const errorTransport = new transports.File({
   level: 'error',
   dirname: path.join(__dirname, '../../private/log'),
   filename: 'error.log',
-  format: format.combine(timestampFormat, format.splat(), fileFormFormat),
+  format: format.combine(timestampFormat, splatFormat(), fileFormFormat),
 });
 
 const infoTransport = new DailyRotateFile({
@@ -54,7 +61,7 @@ const infoTransport = new DailyRotateFile({
   filename: 'info-%DATE%.log',
   datePattern: 'MM-DD',
   maxFiles: '14d',
-  format: format.combine(timestampFormat, format.splat(), fileFormFormat),
+  format: format.combine(timestampFormat, splatFormat(), fileFormFormat),
 });
 
 const devTransport = new transports.Console({
@@ -79,21 +86,21 @@ if (process.env.NODE_ENV === 'production') {
 export namespace Log {
   export const i = function(tag: string, message: any, ...meta: any[]) {
     if (typeof message === 'object') {
-      logger.info(`${tag}: %o`, message);
+      logger.info(`${tag}: ${objectFormat}`, message);
     } else {
       logger.info(`${tag}: ${message}`, ...meta);
     }
   };
   export const e = function(tag: string, message: any, ...meta: any[]) {
     if (typeof message === 'object') {
-      logger.error(`${tag}: %o`, message);
+      logger.error(`${tag}: ${objectFormat}`, message);
     } else {
       logger.error(`${tag}: ${message}`, ...meta);
     }
   };
   export const d = function(tag: string, message: any, ...meta: any[]) {
     if (typeof message === 'object') {
-      logger.debug(`${tag}: %o`, message);
+      logger.debug(`${tag}: ${objectFormat}`, message);
     } else {
       logger.debug(`${tag}: ${message}`, ...meta);
     }
