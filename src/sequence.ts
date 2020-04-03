@@ -60,7 +60,11 @@ export class MySequence implements SequenceHandler {
         this.send(response, data);
       } else {
         Log.e(TAG, url, err);
-        this.reject(context, err);
+        if (err && err.code && typeof err.code === 'number') {
+          context.response.status(err.code);
+          this.send(response, err);
+        }
+        else this.reject(context, err);
       }
     }
   }

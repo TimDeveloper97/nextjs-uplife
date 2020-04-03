@@ -1,6 +1,7 @@
 export * from './common/account.model';
 export * from './common/geopoint.model';
 export * from './admin.model';
+export * from './card.model';
 export * from './category.model';
 export * from './product.model';
 export * from './user-running-record.model';
@@ -9,4 +10,5 @@ export * from './store.model';
 export * from './user-exchange-history.model';
 export * from './user-refill-history.model';
 export * from './user-step-history.model';
+export * from './user-coin-history.model';
 export * from './user.model';

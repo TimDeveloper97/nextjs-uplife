@@ -1,6 +1,7 @@
 import {Request, RestBindings, get} from '@loopback/rest';
 import {inject} from '@loopback/context';
 import {resSpec} from '../utils/spec-generator.util';
+import {Config} from '../config';
 
 const PING_RESPONSE = {
   greeting: {type: 'string'},
@@ -34,6 +35,24 @@ export class SystemController {
       date: new Date(),
       url: this.req.url,
       headers: Object.assign({}, this.req.headers),
+    };
+  }
+
+  @get('/getcoinrate', resSpec('Get exchange rate', PING_RESPONSE, false))
+  getCoinRate(): object {
+    return {
+      poin: 1,
+      coin: Config.COIN_RATE,
+      scale: 1 / Config.COIN_RATE,
+    };
+  }
+
+  @get('/getvndrate', resSpec('Get exchange rate', PING_RESPONSE, false))
+  getVndRate(): object {
+    return {
+      coin: 3,
+      vnd: Config.VND_RATE,
+      scale: 3 / Config.VND_RATE,
     };
   }
 }

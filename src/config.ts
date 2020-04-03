@@ -3,6 +3,8 @@ import path = require('path');
 export namespace Config {
   export const HOST = process.env.PUBLIC_URL || 'http://localhost:3000/';
 
+  export const VND_RATE = 10000;
+  export const COIN_RATE = 1000000;
   export const EARTH_RADIUS = 6371000;
   export const MAX_NEAR_DISTANCE = 10000;
   export const MAX_REFILL_DISTANCE = 100;

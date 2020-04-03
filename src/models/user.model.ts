@@ -4,6 +4,8 @@ import {UserStepHistory} from './user-step-history.model';
 import {UserRefillHistory} from './user-refill-history.model';
 import {UserExchangeHistory} from './user-exchange-history.model';
 import {UserRunningRecord} from './user-running-record.model';
+import {Card} from './card.model';
+import { UserCoinHistory } from './user-coin-history.model';
 
 // @model({
 //   settings: {
@@ -34,8 +36,14 @@ export class User extends Account {
   @property({required: true, default: 0})
   bottleVolumn: number;
 
+  @hasMany(() => Card)
+  card: Card[];
+
   @hasMany(() => UserStepHistory)
   stepHistory?: UserStepHistory[];
+
+  @hasMany(() => UserCoinHistory)
+  coinHistory?: UserCoinHistory[];
 
   @hasMany(() => UserRefillHistory)
   refillHistory?: UserRefillHistory[];

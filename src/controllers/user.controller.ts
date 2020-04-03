@@ -1,4 +1,5 @@
 import dateformat = require('dateformat');
+//import Web3 from 'web3';
 import {repository} from '@loopback/repository';
 import {post, param, get, requestBody, Request, RestBindings, Response, HttpErrors, del, put} from '@loopback/rest';
 import {
@@ -35,10 +36,15 @@ import {
   PostPositionModel,
   PostRunningRecordModel,
   PostEditRunningRecordModel,
+  PostCardModel,
+  PostPointModel,
 } from '../commons/requests';
 import {Config} from '../config';
 import {Validate} from '../commons/validate';
-import {UploadService, FileService, GoogleMapService} from '../services';
+import {UploadService, FileService, GoogleMapService, CoinService} from '../services';
+import {RespCardModel} from '../commons/responses/resp-card.model';
+import {PostCoinModel} from '../commons/requests/post-coin.model';
+import {UserCoinHistory} from '../models/user-coin-history.model';
 
 export class UserController extends AccountMixin<User>(User) {
   constructor(
@@ -60,7 +66,7 @@ export class UserController extends AccountMixin<User>(User) {
     const user = await this.userRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    return new AppResponse({data: new RespUserInfoModel(user)});
+    return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
   }
 
   @post('/api/user/info', resSpec('User profile', RespUserInfoModel))
@@ -81,7 +87,7 @@ export class UserController extends AccountMixin<User>(User) {
         throw new AppResponse({code: 500});
       });
     user.name = userInfo.name;
-    return new AppResponse({data: new RespUserInfoModel(user)});
+    return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
   }
 
   @post('/api/user/avatar', resSpec('User profile', RespUserInfoModel))
@@ -113,7 +119,7 @@ export class UserController extends AccountMixin<User>(User) {
       FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.User.Dir, fileUploaded));
     }
     user = await this.userRepository.findById(currentUser.id);
-    return new AppResponse({data: new RespUserInfoModel(user)});
+    return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
   }
 
   @get('/api/user/token', resSpec('User token', {group: {type: 'string'}, id: {type: 'string'}}))
@@ -255,7 +261,7 @@ export class UserController extends AccountMixin<User>(User) {
       stepTemp: user.stepTemp,
     });
 
-    return new AppResponse({data: new RespUserInfoModel(user)});
+    return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
   }
 
   @get('/api/user/store', resSpec('List refill location', RespLocationRefillModel))
@@ -834,5 +840,91 @@ export class UserController extends AccountMixin<User>(User) {
     const count = await this.userRepository.runningRecord(currentUser.id).delete({id: recordId});
     Log.d('userDeleteRunningRecord: count', count);
     return new AppResponse({code: 200, data: {recordId: count.count ? recordId : ''}});
+  }
+
+  @post('/api/user/card', resSpec('Result add', RespCardModel))
+  @authenticate('jwt')
+  async userAddCard(
+    @inject(SecurityBindings.USER) currentUser: AccountProfile,
+    @requestBody() postCardModel: PostCardModel,
+  ) {
+    postCardModel = new PostCardModel(postCardModel);
+    await this.userRepository.findById(currentUser.id).catch(err => {
+      throw new AppResponse({code: 401});
+    });
+    const exists = await this.userRepository.card(currentUser.id).find({where: {address: postCardModel.address}});
+    if (exists.length > 0) throw new AppResponse({code: 400, message: 'Card already exists'});
+
+    if (!CoinService.isAddress(postCardModel.address))
+      throw new AppResponse({code: 500, message: 'Invalid ethereum anddress'});
+
+    const card = await this.userRepository.card(currentUser.id).create(postCardModel);
+    return new AppResponse({data: new RespCardModel(card)});
+  }
+
+  @get('/api/user/card', resSpec('Card list', RespCardModel))
+  @authenticate('jwt')
+  async userGetCard(@inject(SecurityBindings.USER) currentUser: AccountProfile) {
+    await this.userRepository.findById(currentUser.id).catch(err => {
+      throw new AppResponse({code: 401});
+    });
+    const cards = await this.userRepository.card(currentUser.id).find();
+    Log.d('userGetCard: cards', cards);
+    const results = cards.map(item => new RespCardModel(item));
+    Log.d('userGetCard: cardList', results);
+    return new AppResponse({data: {cardList: results}});
+  }
+
+  @post('/api/user/exchangecoin', resSpec('Result exchange', RespUserInfoModel))
+  @authenticate('jwt')
+  async userExchangeCoin(
+    @inject(SecurityBindings.USER) currentUser: AccountProfile,
+    @requestBody() postPointModel: PostPointModel,
+  ) {
+    postPointModel = new PostPointModel(postPointModel);
+    const user = await this.userRepository.findById(currentUser.id).catch(err => {
+      throw new AppResponse({code: 401});
+    });
+
+    // Handle
+    // exchange point to coin
+    if (user.currentPoint < postPointModel.point)
+      return new AppResponse({code: 406, message: 'Point exchange must lower point have'});
+
+    user.currentPoint -= postPointModel.point;
+    const coin = postPointModel.point / Config.COIN_RATE;
+    const email = user.email;
+
+    await CoinService.addUserCoin(email, coin).catch(err => {
+      throw new AppResponse({code: 402});
+    });
+    this.userRepository.updateById(currentUser.id, user).catch(err => {
+      throw new AppResponse({code: 500});
+    });
+
+    // update history
+    const newCoinHistory = new UserCoinHistory();
+    newCoinHistory.coin = coin;
+    newCoinHistory.point = postPointModel.point;
+    newCoinHistory.time = Helper.getDate();
+
+    await this.userRepository.coinHistory(currentUser.id).create(newCoinHistory);
+
+    return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
+  }
+
+  @post('/api/user/withdraweth', resSpec('Result withdraw', RespUserInfoModel))
+  @authenticate('jwt')
+  async userWithdrawEth(
+    @inject(SecurityBindings.USER) currentUser: AccountProfile,
+    @requestBody() postCoinModel: PostCoinModel,
+  ) {
+    postCoinModel = new PostCoinModel(postCoinModel);
+    const user = await this.userRepository.findById(currentUser.id).catch(err => {
+      throw new AppResponse({code: 401});
+    });
+
+    // Handle
+    return CoinService.withdrawEth(user.email, postCoinModel.address, postCoinModel.coin);
   }
 }
