@@ -97,7 +97,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
         FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Store.Dir, fileName));
       }
     } catch (error) {
-      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Store.Dir, fileUploaded));
+      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Store.Dir, fileName));
     }
     store = await this.storeRepository.findById(currentUser.id);
     return new AppResponse({data: new RespStoreInfoModel(store)});
@@ -118,9 +118,9 @@ export class StoreController extends AccountMixin<Store>(Store) {
     let data: RespProductModel[] = [];
     const store = await this.storeRepository.findById(currentUser.id);
 
-    const products = await this.storeRepository.products(store.id).find(
+    const products = await this.productRepository.find(
       {
-        where: (name && {name: {like: name}}) || undefined,
+        where: (name && {name: {like: name}, storeId: store.id}) || {storeId: store.id},
         order: ['createAt DESC'],
         include: [{relation: 'category'}, {relation: 'store'}],
       },
@@ -164,12 +164,13 @@ export class StoreController extends AccountMixin<Store>(Store) {
     });
 
     const fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
+    const fileName = fileUploaded ? FileService.getFileName(fileUploaded) : '';
     //if (!fileUploaded) throw new HttpErrors.UnprocessableEntity('Missing avatar field.');
 
     try {
       const productpos = new PostProductModel(request.body);
 
-      productpos.imgUrl = fileUploaded || 'default.png';
+      productpos.imgUrl = fileName || 'default.png';
 
       const category = await this.categoryRepository.findOne({
         where: {name: productpos.categoryName.toLocaleLowerCase()},
@@ -185,7 +186,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
       await this.storeRepository.products(store.id).create(product);
       return new AppResponse();
     } catch (error) {
-      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, fileUploaded));
+      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, fileName));
       throw error;
     }
   }
@@ -219,7 +220,9 @@ export class StoreController extends AccountMixin<Store>(Store) {
     const store = await this.storeRepository.findById(currentUser.id).catch(err => {
       throw new AppResponse({code: 401});
     });
-    const fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
+    let fileUploaded = await this.uploadService.uploadImage(request, response, 'avatar');
+    const fileName = FileService.getFileName(fileUploaded);
+    fileUploaded = FileService.moveFile(fileUploaded, Config.ImagePath.Product.Dir, fileName);
 
     try {
       const productpos = new PostProductEditModel(request.body);
@@ -227,11 +230,11 @@ export class StoreController extends AccountMixin<Store>(Store) {
       const product = await this.productRepository.findById(productId).catch(err => {
         throw new AppResponse({code: 404, message: 'Not found product'});
       });
-      if (!product || product.storeId !== store.id) {
+      if (!product || product.storeId.toString() !== store.id) {
         throw new AppResponse({code: 404, message: 'Not found product'});
       }
 
-      productpos.imgUrl = fileUploaded || product.imgUrl;
+      productpos.imgUrl = fileName || product.imgUrl;
 
       const category = await this.categoryRepository.findOne({
         where: {name: productpos.categoryName.toLocaleLowerCase()},
@@ -250,7 +253,8 @@ export class StoreController extends AccountMixin<Store>(Store) {
         FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, product.imgUrl));
       }
     } catch (error) {
-      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, fileUploaded));
+      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.Product.Dir, fileName));
+      throw error;
     }
     return new AppResponse();
   }
@@ -314,7 +318,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
       throw new AppResponse({code: 404});
     });
 
-    if (location.storeId !== store.id) {
+    if (location.storeId.toString() !== store.id) {
       throw new AppResponse({code: 400, message: 'Location invalid'});
     }
 
@@ -363,7 +367,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
         throw new AppResponse({code: 400, message: 'Product not found'});
       });
 
-    if (product.storeId !== currentUser.id) {
+    if (product.storeId.toString() !== currentUser.id) {
       throw new AppResponse({code: 400, message: 'QRcode invalid with store'});
     }
     return new AppResponse({
@@ -408,7 +412,7 @@ export class StoreController extends AccountMixin<Store>(Store) {
         throw new AppResponse({code: 400, message: 'Product not found'});
       });
 
-    if (product.storeId !== currentUser.id) {
+    if (product.storeId.toString() !== currentUser.id) {
       throw new AppResponse({code: 400, message: 'QRcode invalid with store'});
     }
     await this.exchangeHistoryRepository.updateById(exchange.id, {

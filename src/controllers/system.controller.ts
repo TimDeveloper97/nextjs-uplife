@@ -2,6 +2,7 @@ import {Request, RestBindings, get} from '@loopback/rest';
 import {inject} from '@loopback/context';
 import {resSpec} from '../utils/spec-generator.util';
 import {Config} from '../config';
+import {AppResponse} from '../commons/app-response.model';
 
 const PING_RESPONSE = {
   greeting: {type: 'string'},
@@ -38,21 +39,25 @@ export class SystemController {
     };
   }
 
-  @get('/getcoinrate', resSpec('Get exchange rate', PING_RESPONSE, false))
-  getCoinRate(): object {
-    return {
-      poin: 1,
-      coin: Config.COIN_RATE,
-      scale: 1 / Config.COIN_RATE,
-    };
+  @get('api/getcoinrate', resSpec('Get exchange rate', AppResponse, false))
+  getCoinRate(): AppResponse {
+    return new AppResponse({
+      data: {
+        point: 1,
+        coin: Config.COIN_RATE,
+        scale: 1 / Config.COIN_RATE,
+      },
+    });
   }
 
-  @get('/getvndrate', resSpec('Get exchange rate', PING_RESPONSE, false))
-  getVndRate(): object {
-    return {
-      coin: 3,
-      vnd: Config.VND_RATE,
-      scale: 3 / Config.VND_RATE,
-    };
+  @get('api/getvndrate', resSpec('Get exchange rate', AppResponse, false))
+  getVndRate(): AppResponse {
+    return new AppResponse({
+      data: {
+        coin: 3,
+        vnd: Config.VND_RATE,
+        scale: 3 / Config.VND_RATE,
+      },
+    });
   }
 }

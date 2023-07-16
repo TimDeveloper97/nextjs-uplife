@@ -17,18 +17,18 @@ const ApiGetHistoryUrl = CoinServer + '/getHistory';
 const TAG = 'CoinService';
 
 export namespace CoinService {
-  export const isAddress = function (address: string) {
+  export const isAddress = function(address: string) {
     // check if it has the basic requirements of an address
     if (!/^(0x)?[0-9a-f]{40}$/i.test(address)) {
-        return false;
-        // If it's ALL lowercase or ALL upppercase
+      return false;
+      // If it's ALL lowercase or ALL upppercase
     } else if (/^(0x|0X)?[0-9a-f]{40}$/.test(address) || /^(0x|0X)?[0-9A-F]{40}$/.test(address)) {
-        return true;
-        // Otherwise check each case
+      return true;
+      // Otherwise check each case
     } else {
-        return false;
+      return true;
     }
-};
+  };
   export const getUserCoin = async function(email: string) {
     try {
       const response = await Axios.default.get(ApiGetCoinUrl, {
@@ -46,9 +46,7 @@ export namespace CoinService {
     }
   };
   export const addUserCoin = async function(email: string, coin: number) {
-
     try {
-
       const response = await Axios.default.post(
         ApiAddCoinUrl,
         {

@@ -116,7 +116,8 @@ export class UserController extends AccountMixin<User>(User) {
         FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.User.Dir, fileName));
       }
     } catch (error) {
-      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.User.Dir, fileUploaded));
+      FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.User.Dir, fileName));
+      throw error;
     }
     user = await this.userRepository.findById(currentUser.id);
     return new AppResponse({data: await new RespUserInfoModel(user).loadCoin()});
@@ -682,7 +683,9 @@ export class UserController extends AccountMixin<User>(User) {
         ),
       );
       if (fileDownloaded)
-        FileService.removeFile(Helper.getImageLocalPath(Config.ImagePath.UserSelfie.Dir, fileDownloaded));
+        FileService.removeFile(
+          Helper.getImageLocalPath(Config.ImagePath.RunningRecord.Dir, FileService.getFileName(fileDownloaded)),
+        );
       throw error;
     }
   }

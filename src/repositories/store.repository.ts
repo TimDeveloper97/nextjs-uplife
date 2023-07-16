@@ -13,8 +13,8 @@ export class StoreRepository extends TimeStampRepository<Store, typeof Store.pro
 
   constructor(
     @inject('datasources.mongo') dataSource: MongoDataSource,
-    @repository.getter(StoreLocationRepository) storeLocationRepositoryGetter: Getter<StoreLocationRepository>,
-    @repository.getter(ProductRepository) productRepositoryGetter: Getter<ProductRepository>,
+    @repository.getter('StoreLocationRepository') storeLocationRepositoryGetter: Getter<StoreLocationRepository>,
+    @repository.getter('ProductRepository') productRepositoryGetter: Getter<ProductRepository>,
   ) {
     super(Store, dataSource);
     this.locations = this.createHasManyRepositoryFactoryFor('locations', storeLocationRepositoryGetter);
